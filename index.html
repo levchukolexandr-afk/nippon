@@ -337,13 +337,16 @@
         }
 
         function speak(text) {
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'ja-JP';
-                utterance.rate = 0.9;
-                window.speechSynthesis.speak(utterance);
-            }
-        }
+    // Використовуємо надійний метод завантаження mp3 замість системного Web Speech API, 
+    // який часто блокується в Telegram Web App
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(text)}`;
+    const audio = new Audio(url);
+    
+    // Відтворюємо звук
+    audio.play().catch(error => {
+        console.error("Помилка відтворення звуку:", error);
+    });
+}
 
         // Старт додатку
         renderIntro();
