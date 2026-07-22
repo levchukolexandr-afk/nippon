@@ -326,7 +326,10 @@
             tg.sendData(JSON.stringify(data));
         }
 
-        // --- ОЗВУЧКА (Web Speech API) ---
+      // --- ОЗВУЧКА (Google TTS) ---
+        // Створюємо єдиний глобальний плеєр, щоб мобільний браузер його не блокував
+        const globalAudioPlayer = new Audio();
+
         function playAudio() {
             const text = lessonWords[introIndex].jp;
             speak(text);
@@ -337,17 +340,15 @@
         }
 
         function speak(text) {
-    // Використовуємо надійний метод завантаження mp3 замість системного Web Speech API, 
-    // який часто блокується в Telegram Web App
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(text)}`;
-    const audio = new Audio(url);
-    
-    // Відтворюємо звук
-    audio.play().catch(error => {
-        console.error("Помилка відтворення звуку:", error);
-    });
-}
-
+            // Формуємо посилання на аудіо
+            const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(text)}`;
+            
+            // Підставляємо в наш глобальний плеєр і запускаємо
+            globalAudioPlayer.src = url;
+            globalAudioPlayer.play().catch(error => {
+                alert("Звук заблоковано: " + error.name + "\nПеревірте беззвучний режим!");
+            });
+        }
         // Старт додатку
         renderIntro();
     </script>
