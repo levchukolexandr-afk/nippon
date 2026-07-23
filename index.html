@@ -394,6 +394,38 @@ function speakFallback(text) {
         window.speechSynthesis.speak(utterance);
     }
 }
+        async function playJapaneseWord(url, fallbackWord) {
+    try {
+        if (window.audioContext.state === 'suspended') {
+            await window.audioContext.resume();
+        }
+
+        // Робимо запит
+        const response = await fetch(url);
+        
+        // Якщо сервер відповів помилкою (наприклад, 403 Forbidden або 404)
+        if (!response.ok) {
+            throw new Error(`Помилка сервера: ${response.status}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+
+        window.audioContext.decodeAudioData(arrayBuffer, function(buffer) {
+            const source = window.audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(window.audioContext.destination);
+            source.start(0);
+        }, function(error) {
+            alert("Помилка декодування аудіо!"); // Виведемо, якщо формат не підходить
+            speakFallback(fallbackWord);
+        });
+
+    } catch (e) {
+        // ОСЬ ТУТ МИ ПОБАЧИМО, ЩО БЛОКУЄ TELEGRAM
+        alert("Помилка завантаження: " + e.message); 
+        speakFallback(fallbackWord);
+    }
+}
         // Старт додатку
         renderIntro();
     </script>
