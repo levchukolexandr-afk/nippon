@@ -326,8 +326,7 @@
             tg.sendData(JSON.stringify(data));
         }
 
-      // --- ОЗВУЧКА (Google TTS) ---
-        // Створюємо єдиний глобальний плеєр, щоб мобільний браузер його не блокував
+// --- ОЗВУЧКА (Гібридна: Google TTS + Web Speech API) ---
         const globalAudioPlayer = new Audio();
 
         function playAudio() {
@@ -340,13 +339,22 @@
         }
 
         function speak(text) {
-            // Формуємо посилання на аудіо
-            const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(text)}`;
+            // Використовуємо client=gtx (більш стабільний для внутрішніх браузерів Telegram)
+            const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=ja&q=${encodeURIComponent(text)}`;
             
-            // Підставляємо в наш глобальний плеєр і запускаємо
             globalAudioPlayer.src = url;
+            
             globalAudioPlayer.play().catch(error => {
-                alert("Звук заблоковано: " + error.name + "\nПеревірте беззвучний режим!");
+                console.warn("Серверне аудіо недоступне, запускаємо системний голос:", error);
+                
+                // РЕЗЕРВНИЙ ВАРІАНТ: Якщо Telegram блокує завантаження, вмикаємо системний синтезатор
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // Скидаємо попередні слова
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'ja-JP';
+                    utterance.rate = 0.9;
+                    window.speechSynthesis.speak(utterance);
+                }
             });
         }
         // Старт додатку
