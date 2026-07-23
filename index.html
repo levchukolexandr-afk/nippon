@@ -326,106 +326,87 @@
             tg.sendData(JSON.stringify(data));
         }
 
-// Створюємо глобальний об'єкт для роботи зі звуком
-window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+// --- РОБОТА ЗІ ЗВУКОМ ---
 
-function unlockAudioForTelegram() {
-    if (window.audioContext.state === 'suspended') {
-        window.audioContext.resume();
-    }
-    
-    // Створюємо пустий звук (тишу) тривалістю в 1 мілісекунду
-    const buffer = window.audioContext.createBuffer(1, 1, 22050);
-    const source = window.audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(window.audioContext.destination);
-    
-    // Граємо тишу СИНХРОННО з кліком
-    source.start(0);
-
-    // Відписуємося від події, бо розблокувати треба лише один раз
-    document.removeEventListener('touchstart', unlockAudioForTelegram);
-    document.removeEventListener('click', unlockAudioForTelegram);
-}
-
-// Чіпляємо "розблокувальник" на перший клік/тап по екрану
-document.addEventListener('touchstart', unlockAudioForTelegram, { once: true });
-document.addEventListener('click', unlockAudioForTelegram, { once: true });
-        
-// Передавайте сюди URL на mp3 файл або посилання на Google TTS
-async function playJapaneseWord(url, fallbackWord) {
-    try {
-        // Якщо контекст заснув, будимо його
-        if (window.audioContext.state === 'suspended') {
-            await window.audioContext.resume();
+        // 1. Функції для кнопок, яких не вистачало!
+        function playAudio() {
+            const word = lessonWords[introIndex].jp;
+            // Формуємо посилання на Google TTS
+            const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(word)}&tl=ja&client=gtx`;
+            playJapaneseWord(url, word);
         }
 
-        // 1. Завантажуємо аудіо як сирі дані (Blob/ArrayBuffer)
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
+        function playAudioQuiz() {
+            if (!currentQuizWord) return;
+            const word = currentQuizWord.jp;
+            const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(word)}&tl=ja&client=gtx`;
+            playJapaneseWord(url, word);
+        }
 
-        // 2. Декодуємо дані у буфер
-        window.audioContext.decodeAudioData(arrayBuffer, function(buffer) {
-            
-            // 3. Створюємо "плеєр" для цього конкретного звуку
+        // 2. Створюємо глобальний об'єкт для роботи зі звуком
+        window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function unlockAudioForTelegram() {
+            if (window.audioContext.state === 'suspended') {
+                window.audioContext.resume();
+            }
+            const buffer = window.audioContext.createBuffer(1, 1, 22050);
             const source = window.audioContext.createBufferSource();
             source.buffer = buffer;
             source.connect(window.audioContext.destination);
-            
-            // 4. Запускаємо! (source.start не блокується WebView)
             source.start(0);
-            
-        }, function(error) {
-            console.error("Помилка декодування звуку", error);
-            speakFallback(fallbackWord); // Запасний план
-        });
 
-    } catch (e) {
-        console.error("Помилка мережі або завантаження аудіо", e);
-        speakFallback(fallbackWord);
-    }
-}
-        // Якщо аудіо не завантажилось, телефон озвучить слово сам
-function speakFallback(text) {
-    if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ja-JP'; // Японська мова
-        utterance.rate = 0.85;    // Трохи сповільнюємо вимову для студентів
-        window.speechSynthesis.speak(utterance);
-    }
-}
+            document.removeEventListener('touchstart', unlockAudioForTelegram);
+            document.removeEventListener('click', unlockAudioForTelegram);
+        }
+
+        document.addEventListener('touchstart', unlockAudioForTelegram, { once: true });
+        document.addEventListener('click', unlockAudioForTelegram, { once: true });
+        
+        // 3. Головна функція відтворення
         async function playJapaneseWord(url, fallbackWord) {
-    try {
-        if (window.audioContext.state === 'suspended') {
-            await window.audioContext.resume();
-        }
+            try {
+                if (window.audioContext.state === 'suspended') {
+                    await window.audioContext.resume();
+                }
 
-        // Робимо запит
-        const response = await fetch(url);
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`Помилка сервера: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+
+                window.audioContext.decodeAudioData(arrayBuffer, function(buffer) {
+                    const source = window.audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(window.audioContext.destination);
+                    source.start(0);
+                }, function(error) {
+                    alert("Помилка декодування аудіо!"); 
+                    speakFallback(fallbackWord);
+                });
+
+            } catch (e) {
+                // Якщо Telegram заблокує запит (CORS), ми побачимо це повідомлення
+                alert("Помилка завантаження: " + e.message); 
+                speakFallback(fallbackWord);
+            }
+        }
         
-        // Якщо сервер відповів помилкою (наприклад, 403 Forbidden або 404)
-        if (!response.ok) {
-            throw new Error(`Помилка сервера: ${response.status}`);
+        // 4. Запасний план (системний голос)
+        function speakFallback(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ja-JP'; 
+                utterance.rate = 0.85;    
+                window.speechSynthesis.speak(utterance);
+            }
         }
 
-        const arrayBuffer = await response.arrayBuffer();
-
-        window.audioContext.decodeAudioData(arrayBuffer, function(buffer) {
-            const source = window.audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(window.audioContext.destination);
-            source.start(0);
-        }, function(error) {
-            alert("Помилка декодування аудіо!"); // Виведемо, якщо формат не підходить
-            speakFallback(fallbackWord);
-        });
-
-    } catch (e) {
-        // ОСЬ ТУТ МИ ПОБАЧИМО, ЩО БЛОКУЄ TELEGRAM
-        alert("Помилка завантаження: " + e.message); 
-        speakFallback(fallbackWord);
-    }
-}
+        // Старт додатку
+        renderIntro();
         // Старт додатку
         renderIntro();
     </script>
